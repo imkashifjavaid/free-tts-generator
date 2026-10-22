@@ -9,6 +9,19 @@ from tts_gui import TTSApp
 from tests.test_core import CATALOG
 
 
+MULTILINGUAL_CATALOG = [
+    *CATALOG,
+    {"ShortName": "en-GB-LibbyNeural", "Locale": "en-GB", "Gender": "Female",
+     "LocaleName": "English (United Kingdom)"},
+    {"ShortName": "en-AU-WilliamNeural", "Locale": "en-AU", "Gender": "Male",
+     "LocaleName": "English (Australia)"},
+    {"ShortName": "en-IN-NeerjaNeural", "Locale": "en-IN", "Gender": "Female",
+     "LocaleName": "English (India)"},
+    {"ShortName": "ur-IN-GulNeural", "Locale": "ur-IN", "Gender": "Female",
+     "LocaleName": "Urdu (India)"},
+]
+
+
 class DesktopTests(unittest.TestCase):
     def setUp(self):
         try:
@@ -36,6 +49,60 @@ class DesktopTests(unittest.TestCase):
         self.app.search.set("")
         self.app._filter_voices()
         self.assertEqual(self.app.selected_voice(), "en-US-AriaNeural")
+
+    def test_language_filter_groups_all_english_accents_with_readable_labels(self):
+        self.app._handle_event("voices", (parse_voices(MULTILINGUAL_CATALOG), None))
+        self.assertEqual(self.app.language_box["values"], ("All languages", "English", "Urdu"))
+        self.app.language.set("English")
+        self.app.language_box.event_generate("<<ComboboxSelected>>")
+        expected = {item["ShortName"] for item in MULTILINGUAL_CATALOG if item["Locale"].startswith("en-")}
+        self.assertEqual(set(self.app.voice_tree.get_children()), expected)
+        self.assertEqual(self.app.accent_box["values"], (
+            "All accents", "English (Australia)", "English (India)",
+            "English (United Kingdom)", "English (United States)"))
+        self.assertEqual(self.app.voice_tree.item("en-US-AriaNeural", "values")[1], "English (United States)")
+        self.assertIn("English (United States)", self.app.selected_label["text"])
+
+    def test_accent_resets_when_switching_languages_and_other_filters_combine(self):
+        self.app._handle_event("voices", (parse_voices(MULTILINGUAL_CATALOG), None))
+        self.app.language.set("Urdu")
+        self.app._language_changed()
+        self.app.accent.set("Urdu (Pakistan)")
+        self.app.accent_box.event_generate("<<ComboboxSelected>>")
+        self.assertEqual(self.app.voice_tree.get_children(), ("ur-PK-AsadNeural",))
+        self.app.language.set("English")
+        self.app._language_changed()
+        self.assertEqual(self.app.accent.get(), "All accents")
+        self.assertEqual(len(self.app.voice_tree.get_children()), 4)
+        self.app.gender.set("Female")
+        self.app.favorites.add("en-GB-LibbyNeural")
+        self.app.only_favorites.set(True)
+        self.app.search.set("English United Kingdom")
+        self.app._filter_voices()
+        self.assertEqual(self.app.voice_tree.get_children(), ("en-GB-LibbyNeural",))
+        self.app.only_favorites.set(False)
+        self.app.search.set("")
+        self.app.accent.set("English (Australia)")
+        self.app._filter_voices()
+        self.assertEqual(self.app.voice_tree.get_children(), ())
+        self.assertIn("disabled", self.app.generate_button.state())
+
+    def test_refresh_retains_valid_filters_and_resets_removed_accents(self):
+        self.app._handle_event("voices", (parse_voices(MULTILINGUAL_CATALOG), None))
+        self.app.language.set("English")
+        self.app._language_changed()
+        self.app.accent.set("English (United Kingdom)")
+        self.app._handle_event("voices", (parse_voices(MULTILINGUAL_CATALOG), None))
+        self.assertEqual(self.app.language.get(), "English")
+        self.assertEqual(self.app.accent.get(), "English (United Kingdom)")
+        self.assertEqual(self.app.voice_tree.get_children(), ("en-GB-LibbyNeural",))
+        self.app._handle_event("voices", (parse_voices(CATALOG), None))
+        self.assertEqual(self.app.language.get(), "English")
+        self.assertEqual(self.app.accent.get(), "All accents")
+        self.assertEqual(self.app.voice_tree.get_children(), ("en-US-AriaNeural",))
+        self.app._handle_event("voices", (parse_voices(CATALOG[1:]), None))
+        self.assertEqual(self.app.language.get(), "All languages")
+        self.assertEqual(self.app.accent.get(), "All accents")
 
     def test_job_completion_and_cancellation_restore_controls(self):
         self.app.busy = True

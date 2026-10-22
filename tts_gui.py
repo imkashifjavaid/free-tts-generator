@@ -158,7 +158,7 @@ class TTSApp:
         body = ttk.Frame(self.root, style="Base.TFrame")
         body.grid(row=1, column=0, sticky="nsew", padx=26)
         body.columnconfigure(0, weight=3, minsize=440)
-        body.columnconfigure(1, weight=2, minsize=370)
+        body.columnconfigure(1, weight=3, minsize=400)
         body.rowconfigure(0, weight=1)
         script = ttk.Frame(body, padding=18)
         script.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
@@ -211,21 +211,30 @@ class TTSApp:
         self.search = tk.StringVar()
         self.search.trace_add("write", self._schedule_filter)
         ttk.Entry(voices, textvariable=self.search).grid(row=1, column=0, sticky="ew")
-        ttk.Label(voices, text="Search name, language code, or category", style="Muted.TLabel").grid(
+        ttk.Label(voices, text="Search voice, language, country, or category", style="Muted.TLabel").grid(
             row=2, column=0, sticky="w", pady=(5, 10))
         filters = ttk.Frame(voices)
         filters.grid(row=3, column=0, sticky="ew")
-        filters.columnconfigure(0, weight=1)
+        filters.columnconfigure(0, weight=2)
         filters.columnconfigure(1, weight=1)
-        self.locale = tk.StringVar(value="All languages")
+        self.language = tk.StringVar(value="All languages")
+        self.accent = tk.StringVar(value="All accents")
         self.gender = tk.StringVar(value="All genders")
-        self.locale_box = ttk.Combobox(filters, textvariable=self.locale,
-                                       values=["All languages"], state="readonly", width=15)
-        self.locale_box.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ttk.Label(filters, text="Language", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(filters, text="Gender", style="Muted.TLabel").grid(row=0, column=1, sticky="w")
+        self.language_box = ttk.Combobox(filters, textvariable=self.language,
+                                         values=["All languages"], state="readonly", width=20)
+        self.language_box.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=(3, 8))
         self.gender_box = ttk.Combobox(filters, textvariable=self.gender,
                                        values=["All genders", "Female", "Male"], state="readonly", width=13)
-        self.gender_box.grid(row=0, column=1, sticky="ew")
-        self.locale_box.bind("<<ComboboxSelected>>", self._filter_voices)
+        self.gender_box.grid(row=1, column=1, sticky="ew", pady=(3, 8))
+        ttk.Label(filters, text="Accent / region", style="Muted.TLabel").grid(
+            row=2, column=0, columnspan=2, sticky="w")
+        self.accent_box = ttk.Combobox(filters, textvariable=self.accent,
+                                       values=["All accents"], state="readonly", width=30)
+        self.accent_box.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(3, 0))
+        self.language_box.bind("<<ComboboxSelected>>", self._language_changed)
+        self.accent_box.bind("<<ComboboxSelected>>", self._filter_voices)
         self.gender_box.bind("<<ComboboxSelected>>", self._filter_voices)
         favorites_row = ttk.Frame(voices)
         favorites_row.grid(row=4, column=0, sticky="ew", pady=8)
@@ -240,13 +249,15 @@ class TTSApp:
         tree_frame.columnconfigure(0, weight=1)
         self.voice_tree = ttk.Treeview(tree_frame, columns=("name", "locale", "gender"),
                                        show="headings", selectmode="browse", height=8)
-        for key, label, width in (("name", "Voice", 155), ("locale", "Language", 85), ("gender", "Gender", 65)):
+        for key, label, width in (("name", "Voice", 110), ("locale", "Language / accent", 230), ("gender", "Gender", 65)):
             self.voice_tree.heading(key, text=label)
-            self.voice_tree.column(key, width=width, minwidth=55)
+            self.voice_tree.column(key, width=width, minwidth=180 if key == "locale" else 65)
         self.voice_tree.grid(row=0, column=0, sticky="nsew")
         tree_scroll = ttk.Scrollbar(tree_frame, command=self.voice_tree.yview)
         tree_scroll.grid(row=0, column=1, sticky="ns")
-        self.voice_tree.configure(yscrollcommand=tree_scroll.set)
+        tree_horizontal = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.voice_tree.xview)
+        tree_horizontal.grid(row=1, column=0, sticky="ew")
+        self.voice_tree.configure(yscrollcommand=tree_scroll.set, xscrollcommand=tree_horizontal.set)
         self.voice_tree.bind("<<TreeviewSelect>>", self._voice_selected)
         self.voice_tree.bind("<Double-1>", lambda event: self.preview())
         self.selected_label = ttk.Label(voices, text="Select a voice to begin", style="Muted.TLabel", wraplength=330)
@@ -332,20 +343,36 @@ class TTSApp:
             self._cancel_after(self.pending_filter)
         self.pending_filter = self._after(120, self._filter_voices)
 
+    def _update_accent_filter(self):
+        language = self.language.get()
+        accents = sorted({voice.locale_label for voice in self.voices
+                          if language == "All languages" or voice.language == language})
+        self.accent_box.configure(values=["All accents", *accents])
+        if self.accent.get() not in accents:
+            self.accent.set("All accents")
+
+    def _language_changed(self, event=None):
+        self.accent.set("All accents")
+        self._update_accent_filter()
+        self._filter_voices()
+
     def _filter_voices(self, event=None):
         self.pending_filter = None
         selected = self.selected_voice() or self.preferred_voice
         children = self.voice_tree.get_children()
         if children:
             self.voice_tree.delete(*children)
-        locale = "" if self.locale.get() == "All languages" else self.locale.get()
+        language = "" if self.language.get() == "All languages" else self.language.get()
+        accent = "" if self.accent.get() == "All accents" else self.accent.get()
         gender = "" if self.gender.get() == "All genders" else self.gender.get()
         for voice in self.voices:
-            if voice.matches(self.search.get(), locale, gender) and (
+            if voice.matches(self.search.get(), gender=gender, language=language) and (
+                not accent or voice.locale_label == accent
+            ) and (
                 not self.only_favorites.get() or voice.id in self.favorites
             ):
                 name = ("★ " if voice.id in self.favorites else "") + voice.name
-                self.voice_tree.insert("", "end", iid=voice.id, values=(name, voice.locale, voice.gender))
+                self.voice_tree.insert("", "end", iid=voice.id, values=(name, voice.locale_label, voice.gender))
         count = len(self.voice_tree.get_children())
         self.voice_count.configure(text=f"{count} of {len(self.voices)} voices")
         if self.voice_tree.exists(selected):
@@ -363,7 +390,9 @@ class TTSApp:
         selected = self.selected_voice()
         if selected:
             self.preferred_voice = selected
-        self.selected_label.configure(text=selected or "No matching voice selected. Try clearing your filters.")
+        voice = self.voice_by_id.get(selected)
+        self.selected_label.configure(text=f"{voice.name} · {voice.locale_label} · {voice.gender}"
+                                      if voice else "No matching voice selected. Try clearing your filters.")
         self.favorite_button.configure(state="normal" if selected else "disabled",
                                        text="★ Saved" if selected in self.favorites else "☆ Favorite")
         self._update_buttons()
@@ -526,9 +555,11 @@ class TTSApp:
             self.voices, warning = value
             self.voice_by_id = {voice.id: voice for voice in self.voices}
             locales = sorted({voice.locale for voice in self.voices})
-            self.locale_box.configure(values=["All languages", *locales])
-            if self.locale.get() not in locales:
-                self.locale.set("All languages")
+            languages = sorted({voice.language for voice in self.voices})
+            self.language_box.configure(values=["All languages", *languages])
+            if self.language.get() not in languages:
+                self.language.set("All languages")
+            self._update_accent_filter()
             genders = sorted({voice.gender for voice in self.voices})
             self.gender_box.configure(values=["All genders", *genders])
             if self.gender.get() not in genders:
@@ -537,7 +568,7 @@ class TTSApp:
                 self.preferred_voice = self.voices[0].id
             self._filter_voices()
             if not self.busy:
-                self.status.configure(text=warning or f"Ready · {len(self.voices)} voices across {len(locales)} locales")
+                self.status.configure(text=warning or f"Ready · {len(self.voices)} voices · {len(languages)} languages · {len(locales)} accents")
         elif kind == "voice_error":
             self.loading = False
             self.voice_count.configure(text="Catalog unavailable" if not self.voices else f"{len(self.voices)} saved voices")

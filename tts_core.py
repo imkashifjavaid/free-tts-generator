@@ -39,6 +39,17 @@ class Voice:
     gender: str
     name: str
     categories: tuple[str, ...] = ()
+    locale_name: str = ""
+
+    @property
+    def locale_label(self) -> str:
+        return self.locale_name or self.locale
+
+    @property
+    def language(self) -> str:
+        if self.locale_name:
+            return self.locale_name.partition(" (")[0].strip()
+        return self.locale.split("-", 1)[0]
 
     @classmethod
     def from_service(cls, data: dict) -> Voice:
@@ -48,15 +59,21 @@ class Voice:
             raise ValueError("Invalid voice identifier or language")
         tags = data.get("VoiceTag", {})
         categories = tags.get("ContentCategories", []) if isinstance(tags, dict) else []
+        locale_name = data.get("LocaleName")
+        if not isinstance(locale_name, str) or not locale_name.strip():
+            friendly_name = data.get("FriendlyName", "")
+            locale_name = friendly_name.partition(" - ")[2] if isinstance(friendly_name, str) else ""
         return cls(voice_id, locale, str(data.get("Gender", "Unknown")),
                    voice_id.removeprefix(locale + "-").removesuffix("Neural"),
-                   tuple(str(value) for value in categories))
+                   tuple(str(value) for value in categories), locale_name.strip())
 
-    def matches(self, query: str = "", locale: str = "", gender: str = "") -> bool:
-        searchable = " ".join((self.id, self.locale, self.gender, *self.categories)).casefold()
+    def matches(self, query: str = "", locale: str = "", gender: str = "", *,
+                language: str = "") -> bool:
+        searchable = " ".join((self.id, self.name, self.locale_label, self.gender, *self.categories)).casefold()
         return (not locale or self.locale == locale) and (
             not gender or self.gender == gender
-        ) and all(word in searchable for word in query.casefold().split())
+        ) and (not language or self.language == language) and all(
+            word in searchable for word in query.casefold().split())
 
 
 @dataclass(frozen=True)

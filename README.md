@@ -11,7 +11,7 @@ This rebuild also fixes missing installation files, the incorrect launch command
 ## Features
 
 - Resizable desktop studio with a script editor, undo, word/character counts, and estimated narration time.
-- The live Edge voice catalog, with search, all available language/locale filters, gender filters, and favorites.
+- The live Edge voice catalog with full language and accent names, language grouping, optional accent and gender filters, search, and favorites.
 - Preview the first part of your own script before exporting.
 - Adjustable speed, pitch, and volume.
 - Import UTF-8 or UTF-16 `.txt` and `.md` scripts.
@@ -27,6 +27,8 @@ The choices in the catalog are **voices from one speech service**, rather than s
 ## Start on Windows
 
 Install **Python 3.10+** with Tkinter and make `python` available on PATH. Then double-click **`start.bat`**. It creates a `.venv` in this folder, installs or updates the speech dependency, and opens the studio. If an update check fails, it can still open using an installed compatible version.
+
+The startup dependency check is normal. Pip's `Requirement already satisfied` messages mean the packages are installed, with no action needed. The launcher hides this routine output while keeping warnings and errors visible.
 
 To run manually from PowerShell:
 
@@ -53,7 +55,7 @@ MP3 export does not require FFmpeg. Playback opens your system's default audio a
 ## Desktop workflow
 
 1. Paste a script or choose **Import text**. `Ctrl+O` opens the importer.
-2. Search for a name or locale, such as `en-US`, `ur-PK`, `hi-IN`, or `ar-SA`, and select a voice. Use **Favorite** to save voices you like.
+2. Choose a **Language**, such as **English**, to see voices from all its available accents. Leave **Accent / region** on **All accents**, or narrow it to a full name such as **English (United Kingdom)**. Search also accepts voice names, full languages and countries (for example `Urdu`, `Pakistan`, or `English India`), locale codes, and categories. Select a voice and use **Favorite** to save voices you like.
 3. Adjust delivery and choose **Preview voice**. Preview uses up to 280 characters of your script, or a short sample when the editor is empty.
 4. Optionally enable subtitles and playback after export.
 5. Choose **Export MP3** (`Ctrl+Enter`) and a destination. The file is saved with the exact name you choose. A matching `.srt` is saved beside it when enabled.

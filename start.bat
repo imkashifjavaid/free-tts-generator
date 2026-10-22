@@ -7,7 +7,7 @@ if not exist ".venv\Scripts\python.exe" (
     if errorlevel 1 goto :failed
 )
 echo Checking speech dependencies...
-".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --timeout 10 --retries 1 --upgrade -r requirements.txt
+".venv\Scripts\python.exe" -m pip install --quiet --disable-pip-version-check --timeout 10 --retries 1 --upgrade -r requirements.txt
 if errorlevel 1 (
     echo Could not check for updates. Checking the installed version...
     ".venv\Scripts\python.exe" -c "from tts_core import check_dependency; check_dependency()"

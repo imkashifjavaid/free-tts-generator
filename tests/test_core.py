@@ -16,8 +16,10 @@ from tts_core import (
 
 CATALOG = [
     {"ShortName": "en-US-AriaNeural", "Locale": "en-US", "Gender": "Female",
+     "LocaleName": "English (United States)",
      "VoiceTag": {"ContentCategories": ["News", "Novel"]}},
-    {"ShortName": "ur-PK-AsadNeural", "Locale": "ur-PK", "Gender": "Male"},
+    {"ShortName": "ur-PK-AsadNeural", "Locale": "ur-PK", "Gender": "Male",
+     "LocaleName": "Urdu (Pakistan)"},
 ]
 
 
@@ -50,6 +52,24 @@ class TextTests(unittest.TestCase):
         self.assertFalse(voices[0].matches("aria", "ur-PK"))
         self.assertFalse(voices[0].matches("aria", gender="Male"))
         self.assertEqual(parse_voices({"bad": "data"}), [])
+
+    def test_search_accepts_full_language_and_country_names_and_codes(self):
+        voice = parse_voices(CATALOG)[0]
+        self.assertTrue(voice.matches("English United States news"))
+        self.assertTrue(voice.matches("en-US"))
+        self.assertTrue(voice.matches(language="English"))
+        self.assertFalse(voice.matches(language="Urdu"))
+        self.assertFalse(voice.matches("Pakistan"))
+
+    def test_locale_names_prefer_metadata_with_friendly_name_and_code_fallbacks(self):
+        record = {**CATALOG[0], "FriendlyName": "Microsoft Aria Online (Natural) - Wrong name"}
+        self.assertEqual(parse_voices([record])[0].locale_label, "English (United States)")
+        record.update(LocaleName=None, FriendlyName="Microsoft Aria Online (Natural) - English (United States)")
+        voice = parse_voices([record])[0]
+        self.assertEqual(voice.language, "English")
+        self.assertEqual(voice.locale_label, "English (United States)")
+        record.update(LocaleName=" ", FriendlyName=None)
+        self.assertEqual(parse_voices([record])[0].locale_label, "en-US")
 
     def test_rejects_invalid_delivery_settings(self):
         for settings in ({"voice": ""}, {"rate": -100}, {"pitch": 101}, {"volume": 1.5}):
