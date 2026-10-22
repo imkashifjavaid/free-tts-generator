@@ -98,6 +98,83 @@ The app stores `session.json` (including your draft), `voices.json`, and diagnos
 
 Text used for speech and previews is sent to Microsoft's online speech service. Exports stay in the folder you choose.
 
+## Debugging guide
+
+Run the commands below from the repository folder in PowerShell. Use the project's Python so you inspect the same dependencies as the app.
+
+### 1. Reproduce the issue
+
+Note what you were doing, the selected voice, language and accent filters, and the exact error message. Try a short sample script to check whether the issue also happens with simple input. If no voices appear, clear search, select **All languages**, **All accents**, and **All genders**, and turn off **Favorites**.
+
+### 2. Read the application log
+
+On Windows, press **Win + R**, enter `%LOCALAPPDATA%\FreeTTSGenerator\app.log`, and open it with a text editor. Or read the latest entries in PowerShell:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\FreeTTSGenerator\app.log" -Tail 100
+```
+
+To follow new entries while reproducing an issue:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\FreeTTSGenerator\app.log" -Tail 30 -Wait
+```
+
+Press `Ctrl+C` to stop following the log. The log records warnings and failures, including catalog and speech generation exceptions; it does not record every action. If the app fails before logging is configured, the file may not exist or contain the startup error. Use the terminal steps below in that case. See the storage paths above for macOS and Linux.
+
+### 3. Show startup errors in the terminal
+
+```powershell
+.\.venv\Scripts\python.exe tts_gui.py
+```
+
+Keep PowerShell open and reproduce the issue. Copy any traceback printed there. To save terminal output as well:
+
+```powershell
+.\.venv\Scripts\python.exe tts_gui.py 2>&1 | Tee-Object -FilePath debug-console.txt
+```
+
+The launcher's **Checking speech dependencies...** message is normal. **Requirement already satisfied** means a package is installed. Routine pip output is hidden by `start.bat`; warnings and errors remain visible.
+
+### 4. Check dependencies and isolate speech problems
+
+```powershell
+.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip show edge-tts aiohttp
+.\.venv\Scripts\python.exe -m pip check
+```
+
+For missing or outdated dependencies, update them and retry:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
+```
+
+To check voice loading and speech generation without the desktop interface:
+
+```powershell
+.\.venv\Scripts\python.exe tts_cli.py --list-voices --search "English"
+.\.venv\Scripts\python.exe tts_cli.py --text "This is a speech test." --voice en-US-AriaNeural --output debug-speech.mp3
+```
+
+These commands use the online service, although voice listing can fall back to the saved catalog. Choose another output filename if `debug-speech.mp3` already exists. If the CLI also fails, inspect its error for dependency, connection, service, or file permission problems. If it succeeds, focus on the desktop filters, selected voice, script, and export settings.
+
+### 5. Run tests and report the issue
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -v
+git rev-parse --short HEAD
+```
+
+When asking for help or opening an issue, include:
+
+- Steps to reproduce, expected behavior, and what actually happened.
+- Your operating system, Python and `edge-tts` versions, and commit ID.
+- The selected voice and relevant filters or delivery settings.
+- The exact error, relevant log entries, and any failing test output.
+
+Review logs and terminal output before sharing them, and remove private text or paths. `session.json` contains your saved script draft; share only the specific settings needed to explain the issue.
+
 ## Development and checks
 
 The UI is in `tts_gui.py`, speech and persistence in `tts_core.py`, and the command-line entry point in `tts_cli.py`. Importing these modules does not create a window or make network requests.
