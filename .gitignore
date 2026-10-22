@@ -1,0 +1,12 @@
+.venv/
+.tmp/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+.ruff_cache/
+.pytest_cache/
+.tts-*/
+*.mp3
+*.srt
+*.wav

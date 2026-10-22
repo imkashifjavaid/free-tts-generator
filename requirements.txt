@@ -1,0 +1,2 @@
+# 7.3 adds Microsoft's October 2026 connection protocol; 7.3.1 fixes date parsing.
+edge-tts>=7.3.1,<8
